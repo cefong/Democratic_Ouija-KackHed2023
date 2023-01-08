@@ -4,9 +4,19 @@ from printrun import gcoder
 import time
 import json
 import os
+import requests
 
 class KackHed():
   def __init__(self):
+    self.xmin = 3
+    self.xmax = 210
+    self.ymin = 5
+    self.ymax = 235
+    self.xmiddle = (self.xmin + self.xmax)/2
+    self.ymiddle = (self.ymin + self.ymax)/2
+
+    self.last_letter = " "
+
     with open('locations.json') as json_file:
       self.location = json.load(json_file)
     with open('num2letter.json') as json_file:
@@ -25,10 +35,10 @@ class KackHed():
 
   def home(self):
     print("Starting homing sequence")
-    gcode = ["G90"]
+    gcode = [f"G90", "G0 X100 Y75"]
     compiled = self.compileCode(gcode)
     self.send_gcode(compiled)
-    time.sleep(0.5)
+    time.sleep(2)
 
   def compileCode(self, lines):
     gcode = gcoder.LightGCode(lines)
@@ -37,10 +47,13 @@ class KackHed():
     return gcode
 
   def run_loop(self):
+    #self.request_website()
+
     while not self.p.online:
       time.sleep(0.1)
-    self.send_letter()
-    time.sleep(5)
+    self.send_word("Hello World.")
+    #make a da shit wait n make requests
+
     self.p.disconnect()
     return
 
@@ -48,7 +61,6 @@ class KackHed():
     self.p.startprint(gcode)
     return
 
-  """
   def send_random_letter(self):
     import random
     num = str(random.randint(1,10))
@@ -64,21 +76,19 @@ class KackHed():
     compiled = self.compileCode(gcode)
     self.send_gcode(compiled)
     return
-    """
     
   def coordinates2gcode(self, coordinates):
     x = coordinates[0]
     y = coordinates[1] 
     
     # soft limits on possible points
-    if x < 3 or x > 210 or y < 5 or y > 235:
+    if x < self.xmin or x > self.xmax or y < self.ymin or y > self.ymax:
       print("Uh oh spaggetio :(")
       return
     line = f"G0 X{coordinates[0]} Y{coordinates[1]}"
     return line
 
-  def send_letter(self):
-    letter = "goodbye"
+  def send_letter(self, letter):
     print(f"Going to letter: {letter}")
 
     coordinates = self.location[letter]
@@ -89,7 +99,62 @@ class KackHed():
 
     compiled = self.compileCode(gcode)
     self.send_gcode(compiled)
+
+    self.last_letter = letter
     return
+
+  def repeat_letter(self, letter):
+    print(f"repeating letter: {letter}")
+
+    coordinates = self.location[letter]
+    x = coordinates[0]
+    y = coordinates[1]
+    print(f"At coordinates: {coordinates}")
+
+    if x < self.xmiddle:
+      if y < self.ymiddle:
+        #circle left down J
+        gcode = [f"G2 X{x} Y{y} I10 J10"]
+      else:
+        #circle left up
+        gcode = [f"G3 X{x} Y{y} I10 J-10"]
+        pass
+    else:
+      if y < self.ymiddle:
+        #circle right down
+        gcode = [f"G2 X{x} Y{y} I-10 J10"]
+        pass
+      else:
+        #circle right up
+        gcode = [f"G2 X{x} Y{y} I-10 J-10"]
+        pass
+
+    print(f"Using gcode: {gcode}")
+
+    compiled = self.compileCode(gcode)
+    self.send_gcode(compiled)
+
+    self.last_letter = letter
+    
+    return
+
+  def send_word(self, word):
+    word = word.replace(" ", "")
+    word = word.upper()
+    for letter in word:
+      if letter == self.last_letter:
+        self.repeat_letter(letter)
+      else:
+        self.send_letter(letter)
+      time.sleep(4)
+
+  def dwell(self, milliseconds):
+    print("Dwelling for {milliseconds} milliseconds")
+    gcode = [f"G4 P{milliseconds}"]
+    compiled = self.compileCode(gcode)
+    self.send_gcode(compiled)
+    return
+
 
 def __main__():
   kackhed = KackHed()
