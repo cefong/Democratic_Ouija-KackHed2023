@@ -16,6 +16,8 @@ class KackHed():
     self.ymiddle = (self.ymin + self.ymax)/2
 
     self.last_letter = " "
+    self.last_word_state = ""
+    self.new_website_letter = ""
 
     with open('locations.json') as json_file:
       self.location = json.load(json_file)
@@ -46,15 +48,46 @@ class KackHed():
       time.sleep(0.1)
     return gcode
 
+  def set_word_state(self):
+    self.last_word_state
+    x = requests.get('https://cfong71.wixsite.com/mysite/_functions/word')
+    self.word_state = x.json()['word']
+    print(self.word_state)
+    
+    diff = len(self.word_state) - len(self.last_word_state)
+    if diff > 0:
+      print("Case 1")
+      self.new_website_letter = self.word_state[-1]
+      self.new_website_letter = self.new_website_letter.upper()
+    elif diff < 0:
+      print("Case 2")
+      self.new_website_letter = "." 
+    elif len(self.word_state) == 0:
+      print("Case 3")
+      self.new_website_letter = "."
+    else:
+      print("Case 4")
+      self.new_website_letter = ""
+
+    self.last_word_state = self.word_state
+
+    return
+
   def run_loop(self):
-    #self.request_website()
+    self.set_word_state()
 
-    while not self.p.online:
-      time.sleep(0.1)
-    self.send_word("Hello World.")
-    #make a da shit wait n make requests
+    print(self.word_state)
 
-    self.p.disconnect()
+    if self.new_website_letter != "":
+      while not self.p.online:
+        time.sleep(0.1)
+      print(f"Going to print the letter: {self.new_website_letter}")
+      if self.last_letter == self.new_website_letter:
+        self.repeat_letter(self.new_website_letter)
+      else:
+        self.send_letter(self.new_website_letter)
+      self.last_letter = self.new_website_letter
+
     return
 
   def send_gcode(self, gcode):
@@ -104,6 +137,8 @@ class KackHed():
     return
 
   def repeat_letter(self, letter):
+    if letter == ".":
+      return
     print(f"repeating letter: {letter}")
 
     coordinates = self.location[letter]
@@ -158,6 +193,9 @@ class KackHed():
 
 def __main__():
   kackhed = KackHed()
-  kackhed.run_loop()
+  while 1:
+    kackhed.run_loop()
+  
+  kackhed.p.disconnect()
 
 __main__()
